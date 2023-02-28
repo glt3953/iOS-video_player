@@ -34,13 +34,13 @@ NSString * const MAX_BUFFERED_DURATION = @"Max Buffered Duration";
     dispatch_async(dispatch_get_main_queue(), ^{
         NSLog(@"4");
     });
-    [self performSelector:@selector(test2)];
-    [self performSelector:@selector(test3) withObject:nil afterDelay:0];
+//    [self performSelector:@selector(test2)];
+//    [self performSelector:@selector(test3) withObject:nil afterDelay:0];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         NSLog(@"6");
     });
-    [self test1];
+//    [self test1];
 }
 
 - (IBAction)forwardToPlayer:(id)sender {

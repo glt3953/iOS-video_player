@@ -35,6 +35,7 @@ const NSTimeInterval AUSAudioSessionLatency_LowLatency = 0.0058;
     return self;
 }
 
+//根据我们需要硬件设备提供的能力来设置类别
 - (void)setCategory:(NSString *)category
 {
     _category = category;
@@ -50,15 +51,18 @@ const NSTimeInterval AUSAudioSessionLatency_LowLatency = 0.0058;
     
     NSError *error = nil;
     
-    if(![self.audioSession setPreferredSampleRate:self.preferredSampleRate error:&error])
+    //设置采样频率，让硬件设备按照设置的采样率来采集或者播放音频
+    if (![self.audioSession setPreferredSampleRate:self.preferredSampleRate error:&error])
         NSLog(@"Error when setting sample rate on audio session: %@", error.localizedDescription);
     
-    if(![self.audioSession setActive:_active error:&error])
+    //激活 AudioSession
+    if (![self.audioSession setActive:_active error:&error])
         NSLog(@"Error when setting active state of audio session: %@", error.localizedDescription);
     
     _currentSampleRate = [self.audioSession sampleRate];
 }
 
+//设置 I/O 的 Buffer，Buffer 越小说明延迟越低
 - (void)setPreferredLatency:(NSTimeInterval)preferredLatency
 {
     _preferredLatency = preferredLatency;
@@ -79,8 +83,17 @@ const NSTimeInterval AUSAudioSessionLatency_LowLatency = 0.0058;
 
 #pragma mark - notification observer
 
-- (void)onNotificationAudioRouteChange:(NSNotification *)sender {
-    [self adjustOnRouteChange];
+- (void)onNotificationAudioRouteChange:(NSNotification *)notification {
+//    [self adjustOnRouteChange];
+    
+    NSDictionary *interuptionDict = notification.userInfo;
+    NSInteger routeChangeReason = [[interuptionDict valueForKey:AVAudioSessionRouteChangeReasonKey] integerValue];
+    if (routeChangeReason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || routeChangeReason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable || routeChangeReason == AVAudioSessionRouteChangeReasonWakeFromSleep ) {
+        //Do Something
+    } else if (routeChangeReason == AVAudioSessionRouteChangeReasonCategoryChange ||
+    routeChangeReason == AVAudioSessionRouteChangeReasonOverride) {
+        //Do Something
+    }
 }
 
 - (void)adjustOnRouteChange

@@ -74,11 +74,13 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
 {
     OSStatus status = noErr;
     
+    //声明并且实例化一个 AUGraph
     status = NewAUGraph(&_auGraph);
     CheckStatus(status, @"Could not create a new AUGraph", YES);
     
     [self addAudioUnitNodes];
     
+    //打开 AUGraph，其实打开 AUGraph 的过程也是间接实例化 AUGraph 中所有的 AUNode 的过程。注意，必须在获取 AudioUnit 之前打开整个 Graph，否则我们不能从对应的 AUNode 里面获取到正确的 AudioUnit。
     status = AUGraphOpen(_auGraph);
     CheckStatus(status, @"Could not open AUGraph", YES);
     
@@ -101,9 +103,9 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     AudioComponentDescription ioDescription;
     bzero(&ioDescription, sizeof(ioDescription));
     ioDescription.componentManufacturer = kAudioUnitManufacturer_Apple;
-    ioDescription.componentType = kAudioUnitType_Output;
-    ioDescription.componentSubType = kAudioUnitSubType_RemoteIO;
-    
+    ioDescription.componentType = kAudioUnitType_Output; //主要提供的就是 I/O 功能
+    ioDescription.componentSubType = kAudioUnitSubType_RemoteIO; //用来采集音频与播放音频的
+    //利用 AudioUnit 的描述在 AUGraph 中按照描述增加一个 AUNode
     status = AUGraphAddNode(_auGraph, &ioDescription, &_ioNode);
     CheckStatus(status, @"Could not add I/O node to AUGraph", YES);
     
@@ -111,8 +113,8 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     AudioComponentDescription convertDescription;
     bzero(&convertDescription, sizeof(convertDescription));
     ioDescription.componentManufacturer = kAudioUnitManufacturer_Apple;
-    ioDescription.componentType = kAudioUnitType_FormatConverter;
-    ioDescription.componentSubType = kAudioUnitSubType_AUConverter;
+    ioDescription.componentType = kAudioUnitType_FormatConverter; //提供格式转换的功能
+    ioDescription.componentSubType = kAudioUnitSubType_AUConverter; //格式转换效果器
     status = AUGraphAddNode(_auGraph, &ioDescription, &_convertNode);
     CheckStatus(status, @"Could not add Convert node to AUGraph", YES);
 }
@@ -121,6 +123,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
 {
     OSStatus status = noErr;
     
+    //在 AUGraph 中的某个 Node 里面获得 AudioUnit 的引用
     status = AUGraphNodeInfo(_auGraph, _ioNode, NULL, &_ioUnit);
     CheckStatus(status, @"Could not retrieve node info for I/O node", YES);
     
@@ -134,6 +137,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     OSStatus status = noErr;
     AudioStreamBasicDescription streamFormat = [self nonInterleavedPCMFormatWithChannels:_channels];
     
+    //给 AudioUnit 设置数据格式（ASBD）
     status = AudioUnitSetProperty(_ioUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, inputElement,
                                   &streamFormat, sizeof(streamFormat));
     CheckStatus(status, @"Could not set stream format on I/O unit output scope", YES);
@@ -179,6 +183,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
 {
     OSStatus status = noErr;
     
+    //直接将 AUNode 连接起来
     status = AUGraphConnectNodeInput(_auGraph, _convertNode, 0, _ioNode, 0);
     CheckStatus(status, @"Could not connect I/O node input to mixer node input", YES);
     
@@ -189,6 +194,9 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     status = AudioUnitSetProperty(_convertUnit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0,
                                   &callbackStruct, sizeof(callbackStruct));
     CheckStatus(status, @"Could not set render callback on mixer input scope, element 1", YES);
+    
+    //首先构造了一个 AURenderCallback 的结构体，结构体中需要指定一个回调函数，然后设置给 RemoteIO Unit，当这个 RemoteIO Unit 需要数据输入的时候就会回调这个回调函数
+//    AUGraphSetNodeInputCallback(_auGraph, _ioNode, 0, &callbackStruct);
 }
 
 - (void)destroyAudioUnitGraph
@@ -233,6 +241,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
                                                   object:nil];
 }
 
+//监听音频焦点抢占，一般在检测到音频被打断的时候处理一些自己业务上的操作，比如暂停播放音频等
 - (void)onNotificationAudioInterrupted:(NSNotification *)sender {
     AVAudioSessionInterruptionType interruptionType = [[[sender userInfo] objectForKey:AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
     switch (interruptionType) {
