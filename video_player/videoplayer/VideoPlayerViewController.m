@@ -111,7 +111,7 @@
                 NSInteger audioChannels = [_synchronizer getAudioChannels];
                 NSInteger audioSampleRate = [_synchronizer getAudioSampleRate];
                 NSInteger bytesPerSample = 2;
-                _audioOutput = [[AudioOutput alloc] initWithChannels:audioChannels sampleRate:audioSampleRate bytesPerSample:bytesPerSample filleDataDelegate:self];
+                _audioOutput = [[AudioOutput alloc] initWithChannels:audioChannels sampleRate:audioSampleRate bytesPerSample:bytesPerSample fillDataDelegate:self];
                 [_audioOutput play];
                 _isPlaying = YES;
 

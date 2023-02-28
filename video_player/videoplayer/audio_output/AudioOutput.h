@@ -19,7 +19,7 @@
 @property(nonatomic, assign) Float64 sampleRate;
 @property(nonatomic, assign) Float64 channels;
 
-- (id) initWithChannels:(NSInteger) channels sampleRate:(NSInteger) sampleRate bytesPerSample:(NSInteger) bytePerSample filleDataDelegate:(id<FillDataDelegate>) fillAudioDataDelegate;
+- (id) initWithChannels:(NSInteger) channels sampleRate:(NSInteger) sampleRate bytesPerSample:(NSInteger) bytePerSample fillDataDelegate:(id<FillDataDelegate>) fillAudioDataDelegate;
 
 - (BOOL) play;
 - (void) stop;

@@ -24,7 +24,7 @@
 #import "ELAudioSession.h"
 
 static const AudioUnitElement inputElement = 1;
-//static const AudioUnitElement outputElement = 0;
+static const AudioUnitElement outputElement = 0;
 
 static OSStatus InputRenderCallback(void *inRefCon,
                                     AudioUnitRenderActionFlags *ioActionFlags,
@@ -35,8 +35,8 @@ static OSStatus InputRenderCallback(void *inRefCon,
 static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
 
 
-@interface AudioOutput(){
-    SInt16*                      _outData;
+@interface AudioOutput() {
+    SInt16 *_outData;
 }
 
 @property(nonatomic, assign) AUGraph            auGraph;
@@ -51,10 +51,9 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
 
 @implementation AudioOutput
 
-- (id) initWithChannels:(NSInteger) channels sampleRate:(NSInteger) sampleRate bytesPerSample:(NSInteger) bytePerSample filleDataDelegate:(id<FillDataDelegate>) fillAudioDataDelegate;
-{
-    
+- (id)initWithChannels:(NSInteger)channels sampleRate:(NSInteger)sampleRate bytesPerSample:(NSInteger)bytePerSample fillDataDelegate:(id<FillDataDelegate>)fillAudioDataDelegate {
     self = [super init];
+    
     if (self) {
         [[ELAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord];
         [[ELAudioSession sharedInstance] setPreferredSampleRate:sampleRate];
@@ -65,13 +64,14 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
         _fillAudioDataDelegate = fillAudioDataDelegate;
         _sampleRate = sampleRate;
         _channels = channels;
+        
         [self createAudioUnitGraph];
     }
+    
     return self;
 }
 
-- (void)createAudioUnitGraph
-{
+- (void)createAudioUnitGraph {
     OSStatus status = noErr;
     
     //声明并且实例化一个 AUGraph
@@ -96,8 +96,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     CheckStatus(status, @"Could not initialize AUGraph", YES);
 }
 
-- (void)addAudioUnitNodes
-{
+- (void)addAudioUnitNodes {
     OSStatus status = noErr;
     
     AudioComponentDescription ioDescription;
@@ -109,7 +108,6 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     status = AUGraphAddNode(_auGraph, &ioDescription, &_ioNode);
     CheckStatus(status, @"Could not add I/O node to AUGraph", YES);
     
-    
     AudioComponentDescription convertDescription;
     bzero(&convertDescription, sizeof(convertDescription));
     ioDescription.componentManufacturer = kAudioUnitManufacturer_Apple;
@@ -119,21 +117,18 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     CheckStatus(status, @"Could not add Convert node to AUGraph", YES);
 }
 
-- (void)getUnitsFromNodes
-{
+- (void)getUnitsFromNodes {
     OSStatus status = noErr;
     
     //在 AUGraph 中的某个 Node 里面获得 AudioUnit 的引用
     status = AUGraphNodeInfo(_auGraph, _ioNode, NULL, &_ioUnit);
     CheckStatus(status, @"Could not retrieve node info for I/O node", YES);
     
-    
     status = AUGraphNodeInfo(_auGraph, _convertNode, NULL, &_convertUnit);
     CheckStatus(status, @"Could not retrieve node info for Convert node", YES);
 }
 
-- (void)setAudioUnitProperties
-{
+- (void)setAudioUnitProperties {
     OSStatus status = noErr;
     AudioStreamBasicDescription streamFormat = [self nonInterleavedPCMFormatWithChannels:_channels];
     
@@ -155,20 +150,23 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     _clientFormat16int.mBitsPerChannel    = 8 * bytesPerSample;
     _clientFormat16int.mSampleRate        = _sampleRate;
     // spectial format for converter
-    status =AudioUnitSetProperty(_convertUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &streamFormat, sizeof(streamFormat));
+    status = AudioUnitSetProperty(_convertUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &streamFormat, sizeof(streamFormat));
     CheckStatus(status, @"augraph recorder normal unit set client format error", YES);
     status = AudioUnitSetProperty(_convertUnit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &_clientFormat16int, sizeof(_clientFormat16int));
     CheckStatus(status, @"augraph recorder normal unit set client format error", YES);
 }
 
-- (AudioStreamBasicDescription)nonInterleavedPCMFormatWithChannels:(UInt32)channels
-{
+- (AudioStreamBasicDescription)nonInterleavedPCMFormatWithChannels:(UInt32)channels {
     UInt32 bytesPerSample = sizeof(Float32);
     
     AudioStreamBasicDescription asbd;
     bzero(&asbd, sizeof(asbd));
     asbd.mSampleRate = _sampleRate;
     asbd.mFormatID = kAudioFormatLinearPCM;
+    /**
+     kAudioFormatFlagsNativeFloatPacked 指定每个 sample 的表示格式是 Float 格式。这个类似于我们之前讲解的每个 sample 使用两个字节（SInt16）来表示
+     kAudioFormatFlagIsNonInterleaved对音频来说，就是左右声道是非交错存放的，实际的音频数据会存储在一个 AudioBufferList 结构中的变量 mBuffers 中。如果 mFormatFlags 指定的是 NonInterleaved，那么左声道就会在 mBuffers[0]里面，右声道就会在 mBuffers[1]里面
+    */
     asbd.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kAudioFormatFlagIsNonInterleaved;
     asbd.mBitsPerChannel = 8 * bytesPerSample;
     asbd.mBytesPerFrame = bytesPerSample;
@@ -179,11 +177,10 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     return asbd;
 }
 
-- (void)makeNodeConnections
-{
+- (void)makeNodeConnections {
     OSStatus status = noErr;
     
-    //直接将 AUNode 连接起来
+    //直接将 AUNode 连接起来，把 AUConverter Unit 和 RemoteIO Unit 连接起来了，当 RemoteIO Unit 需要播放的数据的时候，就会调用 AUConverter Unit 来获取数据，最终数据会传递到 RemoteIO 中播放出来。
     status = AUGraphConnectNodeInput(_auGraph, _convertNode, 0, _ioNode, 0);
     CheckStatus(status, @"Could not connect I/O node input to mixer node input", YES);
     
@@ -199,8 +196,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
 //    AUGraphSetNodeInputCallback(_auGraph, _ioNode, 0, &callbackStruct);
 }
 
-- (void)destroyAudioUnitGraph
-{
+- (void)destroyAudioUnitGraph {
     AUGraphStop(_auGraph);
     AUGraphUninitialize(_auGraph);
     AUGraphClose(_auGraph);
@@ -211,22 +207,19 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     _auGraph = NULL;
 }
 
-- (BOOL)play
-{
+- (BOOL)play {
     OSStatus status = AUGraphStart(_auGraph);
     CheckStatus(status, @"Could not start AUGraph", YES);
     return YES;
 }
 
-- (void)stop
-{
+- (void)stop {
     OSStatus status = AUGraphStop(_auGraph);
     CheckStatus(status, @"Could not stop AUGraph", YES);
 }
 
 // AudioSession 被打断的通知
-- (void)addAudioSessionInterruptedObserver
-{
+- (void)addAudioSessionInterruptedObserver {
     [self removeAudioSessionInterruptedObserver];
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(onNotificationAudioInterrupted:)
@@ -234,8 +227,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
                                                object:[AVAudioSession sharedInstance]];
 }
 
-- (void)removeAudioSessionInterruptedObserver
-{
+- (void)removeAudioSessionInterruptedObserver {
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:AVAudioSessionInterruptionNotification
                                                   object:nil];
@@ -256,8 +248,7 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
     }
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     if (_outData) {
         free(_outData);
         _outData = NULL;
@@ -271,19 +262,19 @@ static void CheckStatus(OSStatus status, NSString *message, BOOL fatal);
            atTimeStamp:(const AudioTimeStamp *)timeStamp
             forElement:(UInt32)element
           numberFrames:(UInt32)numFrames
-                 flags:(AudioUnitRenderActionFlags *)flags
-{
+                 flags:(AudioUnitRenderActionFlags *)flags {
     @autoreleasepool {
-        for (int iBuffer=0; iBuffer < ioData->mNumberBuffers; ++iBuffer) {
+        for (int iBuffer = 0; iBuffer < ioData->mNumberBuffers; ++iBuffer) {
             memset(ioData->mBuffers[iBuffer].mData, 0, ioData->mBuffers[iBuffer].mDataByteSize);
         }
-        if(_fillAudioDataDelegate)
-        {
+        
+        if (_fillAudioDataDelegate) {
             [_fillAudioDataDelegate fillAudioData:_outData numFrames:numFrames numChannels:_channels];
-            for (int iBuffer=0; iBuffer < ioData->mNumberBuffers; ++iBuffer) {
+            for (int iBuffer = 0; iBuffer < ioData->mNumberBuffers; ++iBuffer) {
                 memcpy((SInt16 *)ioData->mBuffers[iBuffer].mData, _outData, ioData->mBuffers[iBuffer].mDataByteSize);
             }
         }
+        
         return noErr;
     }
 }
@@ -295,8 +286,7 @@ static OSStatus InputRenderCallback(void *inRefCon,
                                     const AudioTimeStamp *inTimeStamp,
                                     UInt32 inBusNumber,
                                     UInt32 inNumberFrames,
-                                    AudioBufferList *ioData)
-{
+                                    AudioBufferList *ioData) {
     AudioOutput *audioOutput = (__bridge id)inRefCon;
     return [audioOutput renderData:ioData
                  atTimeStamp:inTimeStamp
@@ -305,20 +295,18 @@ static OSStatus InputRenderCallback(void *inRefCon,
                        flags:ioActionFlags];
 }
 
-static void CheckStatus(OSStatus status, NSString *message, BOOL fatal)
-{
-    if(status != noErr)
-    {
+static void CheckStatus(OSStatus status, NSString *message, BOOL fatal) {
+    if (status != noErr) {
         char fourCC[16];
         *(UInt32 *)fourCC = CFSwapInt32HostToBig(status);
         fourCC[4] = '\0';
         
-        if(isprint(fourCC[0]) && isprint(fourCC[1]) && isprint(fourCC[2]) && isprint(fourCC[3]))
+        if (isprint(fourCC[0]) && isprint(fourCC[1]) && isprint(fourCC[2]) && isprint(fourCC[3]))
             NSLog(@"%@: %s", message, fourCC);
         else
             NSLog(@"%@: %d", message, (int)status);
         
-        if(fatal)
+        if (fatal)
             exit(-1);
     }
 }
