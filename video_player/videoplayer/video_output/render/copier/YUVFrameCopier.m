@@ -13,18 +13,20 @@ NSString *const yuvVertexShaderString = SHADER_STRING
  attribute vec4 position;
  attribute vec2 texcoord;
  uniform mat4 modelViewProjectionMatrix;
- varying vec2 v_texcoord;
+ varying vec2 v_texcoord; //这个修饰符修饰的变量都是用来在顶点着色器和片元着色器之间传递参数的
  
  void main()
  {
-     gl_Position = modelViewProjectionMatrix * position;
-     v_texcoord = texcoord.xy;
+    //顶点着色器的内置变量，它用来设置顶点转换到屏幕坐标的位置
+    gl_Position = modelViewProjectionMatrix * position;
+    v_texcoord = texcoord.xy;
  }
 );
 
 NSString *const yuvFragmentShaderString = SHADER_STRING
 (
  varying highp vec2 v_texcoord;
+ //二维纹理类型的声明方式
  uniform sampler2D inputImageTexture;
  uniform sampler2D s_texture_u;
  uniform sampler2D s_texture_v;
@@ -39,7 +41,8 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
      highp float g = y - 0.344 * u - 0.714 * v;
      highp float b = y + 1.772 * u;
      
-     gl_FragColor = vec4(r,g,b,1.0);
+    //片元着色器的内置变量，用来指定当前纹理坐标所代表的像素点的最终颜色值。
+    gl_FragColor = vec4(r,g,b,1.0);
  }
  );
 
@@ -73,8 +76,10 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
         glGenFramebuffers(1, &_framebuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
         
+        //获取这个变量的句柄
         glActiveTexture(GL_TEXTURE1);
         glGenTextures(1, &_outputTextureID);
+        //绑定一个纹理
         glBindTexture(GL_TEXTURE_2D, _outputTextureID);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -159,8 +164,10 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
     
     GLfloat modelviewProj[16];
     mat4f_LoadOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, modelviewProj);
+    //把内存中的数据（_uniformMatrix）传递给着色器，modelviewProj 是这个变量在接口程序中的句柄
     glUniformMatrix4fv(_uniformMatrix, 1, GL_FALSE, modelviewProj);
     
+    //粒子效果的场景中，我们一般用点（GL_POINTS）来绘制；直线的场景中，我们主要用线（GL_LINES）来绘制；所有二维图形图像的渲染，都用三角形（GL_TRIANGLE_STRIP）来绘制。
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     

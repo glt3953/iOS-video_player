@@ -55,13 +55,16 @@ static inline GLuint compileShader(GLenum type, NSString *shaderString)
     GLint status;
     const GLchar *sources = (GLchar *)shaderString.UTF8String;
     
+    //创建一个对象，作为 Shader 的容器，这个函数返回一个容器的句柄
     GLuint shader = glCreateShader(type);
     if (shader == 0 || shader == GL_INVALID_ENUM) {
         NSLog(@"Failed to create shader %d", type);
         return 0;
     }
     
+    //把开发者的着色器程序加载到着色器句柄所关联的内存中
     glShaderSource(shader, 1, &sources, NULL);
+    //编译这个 Shader
     glCompileShader(shader);
     
 #ifdef DEBUG
@@ -76,6 +79,7 @@ static inline GLuint compileShader(GLenum type, NSString *shaderString)
     }
 #endif
     
+    //验证Shader 是否被编译成功
     glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
     if (status == GL_FALSE) {
         glDeleteShader(shader);

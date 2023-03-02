@@ -49,6 +49,7 @@
     DirectPassRenderer*                     _directPassRenderer;
 }
 
+//重写父类 UIView 的 layerClass 方法，并且一定要返回 CAEAGLLayer 这个类型
 + (Class) layerClass
 {
     return [CAEAGLLayer class];
@@ -70,6 +71,7 @@
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillResignActive:) name:UIApplicationWillResignActiveNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
         
+        //拿到 layer 并强制把类型转换为 CAEAGLLayer 类型的变量，然后给这个 layer 设置对应的参数
         CAEAGLLayer *eaglLayer = (CAEAGLLayer*) self.layer;
         eaglLayer.opaque = YES;
         eaglLayer.drawableProperties = [NSDictionary dictionaryWithObjectsAndKeys:
@@ -88,12 +90,14 @@
             }
 
             __strong VideoOutput *strongSelf = weakSelf;
+            //创建 OpenGL ES 的上下文
             if (shareGroup) {
                 strongSelf->_context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2 sharegroup:shareGroup];
             } else {
                 strongSelf->_context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
             }
             
+            //绑定上下文，建立好了 EAGL 与 OpenGL ES 的连接
             if (!strongSelf->_context || ![EAGLContext setCurrentContext:strongSelf->_context]) {
                 NSLog(@"Setup EAGLContext Failed...");
             }
@@ -191,6 +195,7 @@ static const NSInteger kMaxOperationQueueCount = 3;
             glBindFramebuffer(GL_FRAMEBUFFER, strongSelf->_displayFramebuffer);
             [strongSelf->_directPassRenderer renderWithWidth:strongSelf->_backingWidth height:strongSelf->_backingHeight position:frame.position];
             glBindRenderbuffer(GL_RENDERBUFFER, strongSelf->_renderbuffer);
+            //将绘制的结果显示到屏幕上
             [strongSelf->_context presentRenderbuffer:GL_RENDERBUFFER];
         }];
     }
@@ -200,15 +205,24 @@ static const NSInteger kMaxOperationQueueCount = 3;
 - (BOOL) createDisplayFramebuffer;
 {
     BOOL ret = TRUE;
+    //创建帧缓冲区
     glGenFramebuffers(1, &_displayFramebuffer);
+    //创建绘制缓冲区
     glGenRenderbuffers(1, &_renderbuffer);
+    //绑定帧缓冲区到渲染管线
     glBindFramebuffer(GL_FRAMEBUFFER, _displayFramebuffer);
+    //绑定绘制缓存区到渲染管线
     glBindRenderbuffer(GL_RENDERBUFFER, _renderbuffer);
+    //为绘制缓冲区分配存储区，这里我们把 CAEAGLLayer 的绘制存储区作为绘制缓冲区的存储区。
     [_context renderbufferStorage:GL_RENDERBUFFER fromDrawable:(CAEAGLLayer*)self.layer];
+    //获取绘制缓冲区的像素宽度
     glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &_backingWidth);
+    //获取绘制缓冲区的像素高度
     glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &_backingHeight);
+    //绑定绘制缓冲区到帧缓冲区
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _renderbuffer);
     
+    //检查 Framebuffer 的 status
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         NSLog(@"failed to make complete framebuffer object %x", status);
