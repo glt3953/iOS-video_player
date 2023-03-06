@@ -268,6 +268,7 @@ static int interrupt_callback(void *ctx)
              * @param log_offset      logging level offset
              * @param log_ctx         parent logging context, can be NULL
              */
+            //音频的格式转换，FFmpeg 提供 libswresample 库让开发者使用，一般称为重采样。
             swrContext = swr_alloc_set_opts(NULL, av_get_default_channel_layout(codecCtx->channels), AV_SAMPLE_FMT_S16, codecCtx->sample_rate, av_get_default_channel_layout(codecCtx->channels), codecCtx->sample_fmt, codecCtx->sample_rate, 0, NULL);
             if (!swrContext || swr_init(swrContext)) {
                 if (swrContext)
@@ -308,11 +309,12 @@ static int interrupt_callback(void *ctx)
     return false;
 }
 
+//建立连接、准备资源
 - (int) openInput: (NSString*) path parameter:(NSDictionary*) parameters;
 {
     AVFormatContext *formatCtx = avformat_alloc_context();
     AVIOInterruptCB int_cb  = {interrupt_callback, (__bridge void *)(self)};
-    formatCtx->interrupt_callback = int_cb;
+    formatCtx->interrupt_callback = int_cb; //调用开发者设置的超时判断的回调函数，询问是否达到超时的条件。
     int openInputErrCode = 0;
     if ((openInputErrCode = [self openFormatInput:&formatCtx path:path parameter:parameters]) != 0) {
         NSLog(@"Video decoder open input file failed... videoSourceURI is %@ openInputErr is %s", path, av_err2str(openInputErrCode));
@@ -323,6 +325,7 @@ static int interrupt_callback(void *ctx)
     [self initAnalyzeDurationAndProbesize:formatCtx parameter:parameters];
     int findStreamErrCode = 0;
     double startFindStreamTimeMills = CFAbsoluteTimeGetCurrent() * 1000;
+    //avformat_find_stream_info函数的内部会发生实际的解码行为，所以解码的数据越多，花费的时间也会越长，对应得到的 MetaData 也会越准确。
     if ((findStreamErrCode = avformat_find_stream_info(formatCtx, NULL)) < 0) {
         avformat_close_input(&formatCtx);
         avformat_free_context(formatCtx);
@@ -360,10 +363,10 @@ static int interrupt_callback(void *ctx)
 - (void) initAnalyzeDurationAndProbesize:(AVFormatContext *)formatCtx parameter:(NSDictionary*) parameters
 {
     float probeSize = [parameters[PROBE_SIZE] floatValue];
-    formatCtx->probesize = probeSize ?: 50 * 1024;
+    formatCtx->probesize = probeSize ?: 50 * 1024; //探测数据量
     NSArray* durations = parameters[MAX_ANALYZE_DURATION_ARRAY];
     if (durations && durations.count > _connectionRetry) {
-        formatCtx->max_analyze_duration = [durations[_connectionRetry] floatValue];
+        formatCtx->max_analyze_duration = [durations[_connectionRetry] floatValue]; //最大的解析数据的长度
     } else {
         float multiplier = 0.5 + (double)pow(2.0, (double)_connectionRetry) * 0.25;
         formatCtx->max_analyze_duration = multiplier * AV_TIME_BASE;
@@ -413,6 +416,7 @@ static int interrupt_callback(void *ctx)
     return frame;
 }
 
+//读取数据进行拆封装、解码、处理数据
 - (NSArray *) decodeFrames: (CGFloat) minDuration decodeVideoErrorState:(int *)decodeVideoErrorState
 {
     if (_videoStreamIndex == -1 && _audioStreamIndex == -1)
@@ -508,6 +512,7 @@ static int interrupt_callback(void *ctx)
             NSLog(@"fail setup video scaler");
             return nil;
         }
+        //将解码器输出的 AVFrame 转换为目标格式的 AVPicture 类型的结构体
         sws_scale(_swsContext,
                   (const uint8_t **)_videoFrame->data,
                   _videoFrame->linesize,
@@ -706,6 +711,7 @@ static int interrupt_callback(void *ctx)
                                     _videoCodecCtx->height) == 0;
     if (!_pictureValid)
         return NO;
+    //视频帧的格式转换，FFmpeg 提供 libswscale 库让开发者使用。
     _swsContext = sws_getCachedContext(_swsContext,
                                        _videoCodecCtx->width,
                                        _videoCodecCtx->height,
@@ -721,6 +727,7 @@ static int interrupt_callback(void *ctx)
 - (void) closeScaler
 {
     if (_swsContext) {
+        //释放掉这个转换上下文
         sws_freeContext(_swsContext);
         _swsContext = NULL;
     }

@@ -79,6 +79,7 @@
                                         kEAGLColorFormatRGBA8, kEAGLDrawablePropertyColorFormat,
                                         nil];
         
+        //创建 OpenGL 线程，线程模型我们采用 NSOperationQueue 来实现，由于一些低端设备执行一次 OpenGL 的绘制耗费的时间可能比较长，如果使用 GCD 的线程模型的话，就有可能导致 DispatchQueue 里面的绘制操作累积得越来越多，并且不能清空。如果使用 NSOperationQueue 的话，可以在检测到这个 Queue 里面的 Operation 的数量，当超过定义的阈值（Threshold）时，就会清空老的 Operation，只保留最新的绘制操作。
         _renderOperationQueue = [[NSOperationQueue alloc] init];
         _renderOperationQueue.maxConcurrentOperationCount = 1;
         _renderOperationQueue.name = @"com.changba.video_player.videoRenderQueue";
@@ -158,6 +159,7 @@ static const NSInteger kMaxOperationQueueCount = 3;
     
     @synchronized (self.renderOperationQueue) {
         NSInteger operationCount = _renderOperationQueue.operationCount;
+        //判断当前 OperationQueue 里面的 operation 的数目，如果大于规定的阈值（一般为 2 或者 3），就说明每一次绘制花费的时间较多，导致渲染队列积攒的数量越来越多了，我们应该删除最久的绘制操作，只保留与阈值个数对应的绘制操作数量，然后将本次绘制操作加入到绘制队列中。
         if (operationCount > kMaxOperationQueueCount) {
             [_renderOperationQueue.operations enumerateObjectsUsingBlock:^(__kindof NSOperation * _Nonnull operation, NSUInteger idx, BOOL * _Nonnull stop) {
                 if (idx < operationCount - kMaxOperationQueueCount) {
@@ -194,9 +196,10 @@ static const NSInteger kMaxOperationQueueCount = 3;
             [strongSelf->_filter renderWithWidth:frameWidth height:frameHeight position:frame.position];
             
             glBindFramebuffer(GL_FRAMEBUFFER, strongSelf->_displayFramebuffer);
+            //使用 GLProgram 进行绘制
             [strongSelf->_directPassRenderer renderWithWidth:strongSelf->_backingWidth height:strongSelf->_backingHeight position:frame.position];
             glBindRenderbuffer(GL_RENDERBUFFER, strongSelf->_renderbuffer);
-            //将绘制的结果显示到屏幕上
+            //将刚刚绘制的内容显示到 layer 上去，最终用户就可以在 UIView 中看到我们刚刚绘制的内容了
             [strongSelf->_context presentRenderbuffer:GL_RENDERBUFFER];
         }];
     }
@@ -238,6 +241,7 @@ static const NSInteger kMaxOperationQueueCount = 3;
     return ret;
 }
 
+//由于所有涉及 OpenGL ES 的操作都要放到绑定了上下文环境的线程中去操作，所以这个方法中对 OpenGL ES 的操作也要保证放到 OperationQueue 中去执行。
 - (void) destroy;
 {
     _stopping = true;
@@ -248,6 +252,7 @@ static const NSInteger kMaxOperationQueueCount = 3;
             return;
         }
         __strong VideoOutput *strongSelf = weakSelf;
+        //把 GLProgram 释放掉
         if(strongSelf->_videoFrameCopier) {
             [strongSelf->_videoFrameCopier releaseRender];
         }
@@ -265,6 +270,8 @@ static const NSInteger kMaxOperationQueueCount = 3;
             glDeleteRenderbuffers(1, &strongSelf->_renderbuffer);
             strongSelf->_renderbuffer = 0;
         }
+        
+        //解除本线程与 OpenGL 上下文之间的绑定
         if ([EAGLContext currentContext] == strongSelf->_context) {
             [EAGLContext setCurrentContext:nil];
         }
@@ -299,4 +306,5 @@ static const NSInteger kMaxOperationQueueCount = 3;
     self.shouldEnableOpenGL = YES;
     [self.shouldEnableOpenGLLock unlock];
 }
+
 @end
