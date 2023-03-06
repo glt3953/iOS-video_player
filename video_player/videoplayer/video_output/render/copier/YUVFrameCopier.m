@@ -78,13 +78,18 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
         
         //获取这个变量的句柄
         glActiveTexture(GL_TEXTURE1);
+        //在显卡中创建一个纹理对象
         glGenTextures(1, &_outputTextureID);
         //绑定一个纹理
         glBindTexture(GL_TEXTURE_2D, _outputTextureID);
+        //缩小（minification）规则的设置，过滤方式都是 GL_LINEAR，这种过滤方式叫做双线性过滤，底层使用双线性插值算法来平滑像素之间的过渡部分
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        //放大（magnification）规则的设置
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        //在纹理坐标系中的 s 轴和 t 轴超出范围的纹理处理规则，GL_CLAMP_TO_EDGE 类型，代表所有大于 1 的像素值都按照 1 这个点的像素值来绘制，所有小于 0 的值都按照 0 这个点的像素值来绘制
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        //将 PNG 素材的内容放到这个纹理对象上面，内存数据上传到显卡
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)frameWidth, (int)frameHeight, 0, GL_BGRA, GL_UNSIGNED_BYTE, 0);
         NSLog(@"width=%d, height=%d", (int)frameWidth, (int)frameHeight);
         
@@ -94,6 +99,7 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
             NSLog(@"failed to make complete framebuffer object %x", status);
         }
         
+        //解绑纹理对象，不会对 _outputTextureID 这个纹理对象做任何操作了
         glBindTexture(GL_TEXTURE_2D, 0);
         
         [self genInputTexture:(int)frameWidth height:(int)frameHeight];
@@ -107,6 +113,7 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
 {
     [super releaseRender];
     if(_outputTextureID){
+        //删掉纹理对象
         glDeleteTextures(1, &_outputTextureID);
         _outputTextureID = 0;
     }
@@ -126,7 +133,9 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
     int frameWidth = (int)[videoFrame width];
     int frameHeight = (int)[videoFrame height];
     glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
+    //使用显卡绘制程序
     glUseProgram(filterProgram);
+    //规定窗口大小
     glViewport(0, 0, frameWidth, frameHeight);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -147,11 +156,14 @@ NSString *const yuvFragmentShaderString = SHADER_STRING
         1.0f, 0.0f,
     };
     
+    //设置物体坐标
     glVertexAttribPointer(filterPositionAttribute, 2, GL_FLOAT, 0, 0, imageVertices);
     glEnableVertexAttribArray(filterPositionAttribute);
+    //设置纹理坐标
     glVertexAttribPointer(filterTextureCoordinateAttribute, 2, GL_FLOAT, 0, 0, noRotationTextureCoordinates);
     glEnableVertexAttribArray(filterTextureCoordinateAttribute);
     
+    //指定我们要绘制的纹理对象，并且将纹理句柄传递给片元着色器中的 uniform 常量
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, _inputTextures[0]);
     glUniform1i(filterInputTextureUniform, 0);

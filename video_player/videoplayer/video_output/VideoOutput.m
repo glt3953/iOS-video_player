@@ -180,6 +180,7 @@ static const NSInteger kMaxOperationQueueCount = 3;
             
             [strongSelf.shouldEnableOpenGLLock lock];
             if (!strongSelf.readyToRender || !strongSelf.shouldEnableOpenGL) {
+                //每次写完绘图代码，想让它立即完成效果的时候，就需要我们自己手动调用 glFlush() 或 gLFinish() 函数，将缓冲区中的指令（无论是否为满）立刻送给图形硬件执行，但是要等待图形硬件执行完后这些指令才返回。
                 glFinish();
                 [strongSelf.shouldEnableOpenGLLock unlock];
                 return;

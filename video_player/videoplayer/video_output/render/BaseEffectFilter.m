@@ -46,6 +46,7 @@
     //链接程序
     glLinkProgram(filterProgram);
     
+    //将filterProgram中的重点属性以及常量的句柄寻找出来，以备后续渲染过程中向顶点着色器和片元着色器传递数据
     filterPositionAttribute = glGetAttribLocation(filterProgram, "position");
     filterTextureCoordinateAttribute = glGetAttribLocation(filterProgram, "texcoord");
     filterInputTextureUniform = glGetUniformLocation(filterProgram, "inputImageTexture");
