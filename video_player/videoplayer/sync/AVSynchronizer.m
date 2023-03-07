@@ -96,6 +96,7 @@ static void* runDecoderThread(void* ptr)
     return _completion;
 }
 
+//解码线程运行起来，解码音频帧和视频帧。解码出来的音视频帧封装为我们自定义的结构体 AudioFrame 和 VideoFrame，然后把它们分别放入音视频队列中。
 - (void) run
 {
     while(isOnDecoding){
@@ -179,6 +180,7 @@ static void* decodeFirstBufferRunLoop(void* ptr)
     if(!isDestroyed) {
         pthread_mutex_lock(&videoDecoderLock);
 //        NSLog(@"Before signal First decode Buffer...");
+        //发送 Signal 指令，让生产者线程继续生产数据。
         pthread_cond_signal(&videoDecoderCondition);
 //        NSLog(@"After signal First decode Buffer...");
         pthread_mutex_unlock(&videoDecoderLock);
@@ -569,10 +571,11 @@ float lastPosition = -1.0;
         return;
     }
     
-    void* status;
+    //再发送一次 Signal 指令，让解码线程有机会结束。
     pthread_mutex_lock(&videoDecoderLock);
     pthread_cond_signal(&videoDecoderCondition);
     pthread_mutex_unlock(&videoDecoderLock);
+    void* status;
     pthread_join(videoDecoderThread, &status);
     pthread_mutex_destroy(&videoDecoderLock);
     pthread_cond_destroy(&videoDecoderCondition);
